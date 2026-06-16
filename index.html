@@ -446,6 +446,30 @@
       margin-bottom: 6px;
     }
 
+    #setup .setup-seed {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 10px 0 6px;
+      font-size: 12px;
+      color: #444;
+    }
+
+    #setup .setup-seed input {
+      width: 140px;
+      padding: 4px 6px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    #setup .setup-seed input:focus {
+      outline: none;
+      border-color: var(--blue);
+    }
+
     #setup table {
       background: #fff;
     }
@@ -680,6 +704,12 @@
       that requires running <code>python3 server.py</code>.
     </p>
     <div id="setup-msg" class="hidden"></div>
+
+    <div class="setup-seed">
+      <label for="team-seed"><b>Team seed</b></label>
+      <input id="team-seed" type="number" inputmode="numeric" placeholder="random">
+      <span class="setup-help" style="margin:0;">Used to shuffle the initial player order. Leave blank for random.</span>
+    </div>
 
     <h3>Players</h3>
     <p class="setup-help">
@@ -1138,6 +1168,30 @@
         [a[i], a[j]] = [a[j], a[i]];
       }
       return a;
+    }
+
+    function shuffleCopyWithSeed(items, seed) {
+      const copy = items.slice();
+      const savedState = _rngState;
+      const seedToUse = (seed === undefined || seed === null || seed === '')
+        ? Math.floor(Math.random() * 0x7fffffff)
+        : (seed | 0);
+      setSeed(seedToUse || 1);
+      shuffleArr(copy);
+      _rngState = savedState;
+      return copy;
+    }
+
+    function parseSeedValue(value) {
+      const text = String(value == null ? '' : value).trim();
+      if (!text) return null;
+      const seed = parseInt(text, 10);
+      return Number.isFinite(seed) ? seed : null;
+    }
+
+    function orderedPlayerNames(names, seed) {
+      const players = (names || []).slice().sort((a, b) => a.localeCompare(b));
+      return shuffleCopyWithSeed(players, seed);
     }
     function combinations(arr, k) {
       // Iterative C(n,k) generator → returns list of index-tuples (as arrays).
@@ -1745,7 +1799,9 @@
         }
       }
       const teamSeed = (opts.teamSeed === undefined || opts.teamSeed === null)
-        ? Math.floor(Math.random() * 100000)
+        ? (cfg.team_seed === undefined || cfg.team_seed === null || cfg.team_seed === '')
+          ? Math.floor(Math.random() * 100000)
+          : (cfg.team_seed | 0)
         : (opts.teamSeed | 0);
       bestSlots = shuffleTeamsJs(bestSlots, teamSeed, teamsByIdx);
       // Flatten slots to matches[] with slotIdx + slotLabel.
@@ -1902,11 +1958,16 @@
     }
 
     function setupRender(cfg) {
+      const teamSeedInput = document.querySelector('#team-seed');
+      if (teamSeedInput) {
+        teamSeedInput.value = (cfg.team_seed === undefined || cfg.team_seed === null) ? '' : cfg.team_seed;
+      }
+
       // Players
       const ptbody = document.querySelector('#players-table tbody');
       ptbody.innerHTML = '';
       const players = cfg.players || {};
-      Object.keys(players).forEach(name => {
+      orderedPlayerNames(Object.keys(players), cfg.team_seed).forEach(name => {
         const p = players[name] || {};
         setupAddPlayerRow(name, p.team || '');
       });
@@ -1964,14 +2025,22 @@
     }
 
     function setupGather() {
-      const players = {};
+      const playerMap = {};
       document.querySelectorAll('#players-table tbody tr').forEach(tr => {
         const name = tr.querySelector('.p-name').value.trim();
         if (!name) return;
         const team = tr.querySelector('.p-team').value.trim();
         const entry = {};
         if (team && team.toLowerCase() !== 'random') entry.team = team;
-        players[name] = Object.keys(entry).length ? entry : null;
+        playerMap[name] = Object.keys(entry).length ? entry : null;
+      });
+
+      const cfg = { players: {}, games: {} };
+      const teamSeedInput = document.querySelector('#team-seed');
+      const teamSeed = parseSeedValue(teamSeedInput ? teamSeedInput.value : '');
+      if (teamSeed !== null) cfg.team_seed = teamSeed;
+      orderedPlayerNames(Object.keys(playerMap), teamSeed).forEach(name => {
+        cfg.players[name] = playerMap[name];
       });
 
       const games = {};
@@ -1990,7 +2059,8 @@
         games[name] = entry;
       });
 
-      return { players: players, games: games };
+      cfg.games = games;
+      return cfg;
     }
 
     function setupValidateLocal(cfg) {
