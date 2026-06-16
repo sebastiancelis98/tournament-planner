@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tournament</title>
+<style>
+  :root {
+    --blue:#1F4E79; --lblue:#BDD7EE; --gold:#FFD700;
+    --green:#E2EFDA; --orange:#FCE4D6; --grey:#F2F2F2;
+    --red:#c00000;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:Segoe UI,Arial,sans-serif; font-size:13px; background:#f5f7fa; color:#222; }
+  h1 { background:var(--blue); color:#fff; padding:14px 20px; font-size:1.4em; }
+  h2 { margin:18px 20px 8px; color:var(--blue); border-bottom:2px solid var(--lblue); padding-bottom:4px; }
+  nav { display:flex; gap:8px; padding:10px 20px; background:#fff; border-bottom:1px solid #ddd; }
+  nav button {
+    padding:7px 18px; border:2px solid var(--blue); border-radius:6px;
+    background:#fff; color:var(--blue); font-weight:bold; cursor:pointer; transition:.15s;
+  }
+  nav button.active { background:var(--blue); color:#fff; }
+  .tab { display:none; padding:0 20px 30px; }
+  .tab.active { display:block; }
+
+  /* Schedule */
+  table { border-collapse:collapse; width:100%; margin-top:6px; }
+  th { background:var(--lblue); padding:7px 8px; text-align:left; font-size:12px;
+        position:sticky; top:0; z-index:2; }
+  td { padding:6px 8px; border-bottom:1px solid #e0e0e0; vertical-align:top; }
+  tr:hover td { background:#eef4fb; }
+  .slot-num { background:var(--lblue); font-weight:bold; text-align:center; width:60px; }
+  .fmt { color:#666; font-size:11px; }
+  .fun { color:var(--red); font-style:italic; }
+  .fun-cell { color:var(--red); font-size:11px; }
+  .sit-cell { color:#777; font-size:11px; }
+  tr.match-done td { text-decoration:line-through; opacity:.55; }
+  tr.match-done:hover td { opacity:.75; }
+  .player-btns { display:flex; flex-wrap:wrap; gap:4px; margin:10px 0; }
+  .player-btn { padding:5px 14px; border-radius:15px; border:2px solid transparent;
+    cursor:pointer; font-weight:bold; font-size:12px; transition:.15s; }
+  .player-btn.busy { background:#c00000; color:#fff; border-color:#900; }
+  .player-btn.free { background:#70ad47; color:#fff; border-color:#4e8a30; }
+  .rec-section { background:#fff; border-radius:8px; padding:10px 14px; margin:10px 0;
+    border-left:4px solid var(--blue); box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .rec-match { padding:4px 0; font-size:13px; }
+  .rec-match + .rec-match { border-top:1px solid #eee; padding-top:6px; }
+
+  /* Scoreboard – match cards */
+  .match-card {
+    background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.12);
+    margin-bottom:14px; overflow:hidden;
+  }
+  .match-hdr {
+    background:var(--blue); color:#fff; padding:9px 14px;
+    display:flex; justify-content:space-between; align-items:center;
+    cursor:pointer; user-select:none;
+  }
+  .match-hdr .mname { font-weight:bold; font-size:1.05em; }
+  .match-hdr .mslot { font-size:12px; opacity:.8; }
+  .match-body { padding:14px 16px; }
+
+  /* Team vs layout */
+  .vs-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .team-block {
+    flex:1; min-width:140px; background:var(--grey); border-radius:8px; padding:10px 12px;
+  }
+  .team-block.winner { background:var(--green); border:2px solid #70ad47; }
+  .team-block.loser  { background:var(--orange); border:2px solid #e0a080; opacity:.85; }
+  .team-block.draw   { background:#fff3cd; border:2px solid #ffc107; }
+  .team-label { font-size:11px; color:#555; margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px; }
+  .team-players { font-weight:bold; font-size:13px; margin-bottom:8px; }
+  .team-players .fun-p { color:var(--red); font-style:italic; font-weight:normal; font-size:12px; }
+  .score-input {
+    width:70px; padding:5px 8px; border:2px solid #bbb; border-radius:6px;
+    font-size:20px; font-weight:bold; text-align:center;
+  }
+  .score-input:focus { outline:none; border-color:var(--blue); }
+  .vs-divider { font-size:22px; font-weight:bold; color:#888; padding:0 4px; }
+  .result-badge {
+    margin-top:10px; padding:4px 10px; border-radius:12px; font-size:12px;
+    font-weight:bold; display:inline-block;
+  }
+  .badge-win  { background:#70ad47; color:#fff; }
+  .badge-loss { background:#e0a080; color:#fff; }
+  .badge-draw { background:#ffc107; color:#333; }
+  .pts-note { font-size:11px; color:#555; margin-top:5px; }
+
+  /* FFA layout */
+  .ffa-grid { display:flex; flex-wrap:wrap; gap:8px; }
+  .ffa-player {
+    background:var(--grey); border-radius:8px; padding:8px 12px; min-width:130px; flex:1;
+  }
+  .ffa-player .fp-name { font-weight:bold; font-size:13px; margin-bottom:4px; }
+  .ffa-player .fp-name.fun-p { color:var(--red); font-style:italic; }
+  .ffa-score {
+    width:70px; padding:4px 6px; border:2px solid #bbb; border-radius:6px;
+    font-size:18px; font-weight:bold; text-align:center;
+  }
+  .ffa-score:focus { outline:none; border-color:var(--blue); }
+  .ffa-pts { font-size:11px; color:#555; margin-top:4px; }
+
+  /* Scoreboard filter bar */
+  .score-filter-bar { display:flex; gap:8px; margin-bottom:14px; align-items:center; }
+  .score-filter-bar span { font-size:12px; color:#555; margin-right:4px; }
+  .filter-btn {
+    padding:4px 14px; border-radius:14px; border:2px solid #bbb;
+    background:#f5f5f5; color:#333; font-size:12px; cursor:pointer;
+    font-weight:600; transition:background .15s,border-color .15s;
+  }
+  .filter-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .filter-btn:hover:not(.active) { border-color:#888; }
+  .match-card.card-hidden { display:none; }
+
+  /* Standings */
+  .standing-table th { background:var(--blue); color:#fff; text-align:center; }
+  .standing-table td { text-align:center; }
+  .standing-table tr:nth-child(even) td { background:var(--grey); }
+  .standing-table .rank1 { background:var(--gold) !important; font-weight:bold; }
+
+  /* Setup tab */
+  #setup h3 { margin:18px 0 6px; color:var(--blue); font-size:1.05em; }
+  #setup .setup-help { font-size:11px; color:#666; margin-bottom:6px; }
+  #setup table { background:#fff; }
+  #setup table th { background:var(--blue); color:#fff; font-size:11px;
+    text-align:left; padding:6px 8px; position:static; }
+  #setup table td { padding:4px 6px; vertical-align:middle; }
+  #setup input[type=text], #setup input[type=number] {
+    padding:4px 6px; border:1px solid #bbb; border-radius:4px; font-size:12px;
+    font-family:inherit;
+  }
+  #setup input[type=text]:focus, #setup input[type=number]:focus {
+    outline:none; border-color:var(--blue);
+  }
+  #setup input.name-input { width:130px; font-weight:bold; }
+  #setup input.num-input { width:56px; text-align:center; }
+  #setup input.team-input { width:140px; }
+  #setup .row-del {
+    background:#e0a080; color:#fff; border:none; border-radius:50%;
+    width:22px; height:22px; cursor:pointer; font-weight:bold; line-height:1;
+  }
+  #setup .row-del:hover { background:var(--red); }
+  #setup .add-btn {
+    margin-top:6px; padding:5px 12px; border-radius:6px; border:2px solid var(--blue);
+    background:#fff; color:var(--blue); font-weight:bold; cursor:pointer;
+  }
+  #setup .add-btn:hover { background:var(--lblue); }
+  #setup .setup-actions {
+    margin-top:24px; padding-top:14px; border-top:1px solid #ddd;
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  }
+  #setup .setup-actions button {
+    padding:8px 18px; border-radius:6px; font-weight:bold;
+    cursor:pointer; border:2px solid var(--blue); font-size:13px;
+  }
+  #setup .btn-save { background:#fff; color:var(--blue); }
+  #setup .btn-save:hover { background:var(--lblue); }
+  #setup .btn-regen { background:var(--red); color:#fff; border-color:var(--red); }
+  #setup .btn-regen:hover { background:#900; border-color:#900; }
+  #setup .setup-warn { font-size:11px; color:#a04040; flex-basis:100%; }
+  #setup-msg { margin:10px 0; padding:8px 12px; border-radius:6px; font-size:12px; }
+  #setup-msg.ok { background:var(--green); color:#264d1a; }
+  #setup-msg.err { background:var(--orange); color:#7a2a00; white-space:pre-wrap;
+    font-family:monospace; }
+  #setup-msg.info { background:var(--lblue); color:var(--blue); }
+  #setup-msg.hidden { display:none; }
+  .checkbox-cell { text-align:center; }
+</style>
+</head>
+<body>
+<h1>🏆 Tournament</h1>
+<nav>
+  <button class="active" onclick="showTab('schedule',this)">Schedule</button>
+  <button onclick="showTab('scoreboard',this)">Scoreboard</button>
+  <button onclick="showTab('standings',this)">Standings</button>
+  <button onclick="showTab('setup',this)">Setup</button>
+</nav>
+
+<!-- Schedule -->
+<div id="schedule" class="tab active">
+<h2>Match Schedule</h2>
+<div style="margin:8px 0 4px">
+  <b style="font-size:12px;color:#555;">Player Availability:</b>
+  <span style="font-size:11px;color:#888;margin-left:8px;">Click to toggle (green&nbsp;=&nbsp;free, red&nbsp;=&nbsp;playing)</span>
+</div>
+<div id="player-btns" class="player-btns"></div>
+<div id="recommendations" class="rec-section" style="display:none"></div>
+<table>
+  <thead><tr>
+    <th>Slot</th><th>Game</th><th>Format</th>
+    <th>Team 1 / Players</th><th>Team 2</th>
+    <th>For fun (no pts)</th><th>Sitting out</th>
+  </tr></thead>
+  <tbody id="sched-body"></tbody>
+</table>
+</div>
+
+<!-- Scoreboard -->
+<div id="scoreboard" class="tab">
+<h2>Enter Match Results</h2>
+<p style="color:#555;margin:0 0 14px;font-size:12px;">
+  Team matches: Win&nbsp;=&nbsp;2&nbsp;pts, Draw&nbsp;=&nbsp;1&nbsp;pt, Loss&nbsp;=&nbsp;0&nbsp;pts &nbsp;|&nbsp;
+  FFA: ranked by score entered (1st gets most points). Fun&nbsp;★&nbsp;players never earn points.
+</p>
+<div class="score-filter-bar">
+  <span>Show:</span>
+  <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+  <button class="filter-btn" onclick="setFilter('unscored',this)">Not&nbsp;Scored</button>
+  <button class="filter-btn" onclick="setFilter('scored',this)">Scored</button>
+</div>
+<div id="match-cards"></div>
+</div>
+
+<!-- Standings -->
+<div id="standings" class="tab">
+<h2>Live Standings</h2>
+<table class="standing-table">
+  <thead><tr><th>#</th><th>Player</th><th>Points</th><th>Games</th></tr></thead>
+  <tbody id="stand-body"></tbody>
+</table>
+</div>
+
+<!-- Setup -->
+<div id="setup" class="tab">
+<h2>Setup</h2>
+<p class="setup-help">
+  Edit players and games below, then regenerate the tournament.
+  Regenerate runs entirely in the browser — works offline (even on your phone).
+  The <b>Save config</b> button additionally writes <code>config.yaml</code> to disk;
+  that requires running <code>python3 server.py</code>.
+</p>
+<div id="setup-msg" class="hidden"></div>
+
+<h3>Players</h3>
+<p class="setup-help">
+  Players sharing a <b>team</b> name are placed on the same side in team games
+  (leave blank or write <code>random</code> for random assignment).
+</p>
+<table id="players-table">
+  <thead><tr>
+    <th>Name</th><th>Team</th><th></th>
+  </tr></thead>
+  <tbody></tbody>
+</table>
+<button class="add-btn" onclick="setupAddPlayer()">+ Add player</button>
+
+<h3>Games</h3>
+<p class="setup-help">
+  Min/Max/Pref are team sizes for team games, or match sizes for FFA.
+  Repeats = how many times the game is played. Keep teams = lock teams across repeats.
+</p>
+<table id="games-table">
+  <thead><tr>
+    <th>Name</th><th>Min</th><th>Max</th><th>Pref</th>
+    <th class="checkbox-cell">FFA</th><th>Repeats</th>
+    <th class="checkbox-cell">Keep teams</th><th></th>
+  </tr></thead>
+  <tbody></tbody>
+</table>
+<button class="add-btn" onclick="setupAddGame()">+ Add game</button>
+
+<div class="setup-actions">
+  <button class="btn-save" onclick="setupSave()">💾 Save config</button>
+  <button class="btn-regen" onclick="setupRegenerate()">🔄 Save &amp; regenerate tournament</button>
+  <div class="setup-warn">
+    ⚠ Regenerating creates a brand-new schedule. Any match scores you've already entered will be lost.
+  </div>
+</div>
+</div>
+
+<script>
+let NAMES   = ["Sebi", "Mateo", "Cris F.", "John", "Paula", "Diego"];
+let MATCHES = [{"game": "Volley", "note": "3v3", "slotIdx": 1, "slotLabel": "Slot 1", "isFfa": false, "team1": [4, 0, 1], "team2": [2, 3, 5], "funPlayers": []}, {"game": "Volley", "note": "3v3", "slotIdx": 2, "slotLabel": "Slot 2", "isFfa": false, "team1": [2, 0, 5], "team2": [1, 3, 4], "funPlayers": []}, {"game": "Volley", "note": "3v3", "slotIdx": 3, "slotLabel": "Slot 3", "isFfa": false, "team1": [4, 0, 3], "team2": [5, 1, 2], "funPlayers": []}, {"game": "Volley", "note": "3v3", "slotIdx": 4, "slotLabel": "Slot 4", "isFfa": false, "team1": [1, 5, 0], "team2": [4, 2, 3], "funPlayers": []}];
+const INITIAL_CONFIG = {"games": {"Volley": {"max_players": 4, "min_players": 2, "preferred_players": 3, "ffa": false, "repeat_game": 4, "repeat_teams": false}}, "players": {"Sebi": {}, "Mateo": {}, "Cris F.": {}, "John": {}, "Paula": {}, "Diego": {}}};
+const CONFIG_STORAGE_KEY = 'tournament_config_v1';
+
+function computeStorageKey(matches) {
+  // Simple deterministic string hash (djb2) over the JSON of matches.
+  const s = JSON.stringify(matches);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return 'tournament_' + h.toString(16);
+}
+
+let STORAGE_KEY = computeStorageKey(MATCHES);
+let playerPts = new Array(NAMES.length).fill(0);
+let matchScores = loadScores();
+
+function loadScores() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) { const saved = JSON.parse(raw); if (saved.length === MATCHES.length) return saved; }
+  } catch(e) {}
+  return MATCHES.map(m => m.isFfa ? {ffa: m.team1.map(() => null)} : {t1: null, t2: null});
+}
+function saveScores() { localStorage.setItem(STORAGE_KEY, JSON.stringify(matchScores)); }
+
+function recomputeAll() {
+  playerPts.fill(0);
+  MATCHES.forEach((m, mi) => {
+    const funSet = new Set(m.funPlayers);
+    if (m.isFfa) {
+      const scores = matchScores[mi].ffa;
+      const allP = m.team1
+        .map((pi, i) => ({ pi, score: scores[i] }))
+        .filter(x => x.score !== null && !isNaN(x.score));
+      allP.sort((a, b) => b.score - a.score);
+      const n = allP.length;
+      allP.forEach((x, rank) => { if (!funSet.has(x.pi)) playerPts[x.pi] += (n - 1 - rank); });
+    } else {
+      const t1 = matchScores[mi].t1;
+      const t2 = matchScores[mi].t2;
+      if (t1 === null || t2 === null || isNaN(t1) || isNaN(t2)) return;
+      const earn = (piList, pts) => piList.forEach(pi => { if (!funSet.has(pi)) playerPts[pi] += pts; });
+      if      (t1 > t2) { earn(m.team1, 2); earn(m.team2, 0); }
+      else if (t2 > t1) { earn(m.team2, 2); earn(m.team1, 0); }
+      else              { earn(m.team1, 1); earn(m.team2, 1); }
+    }
+  });
+}
+
+function showTab(id, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'standings') renderStandings();
+  if (id === 'schedule') updateScheduleStrikethrough();
+  if (id === 'setup') setupLoad();
+}
+
+function playerLabel(piList, funSet) {
+  return piList.map(pi => {
+    const n = NAMES[pi];
+    return funSet.has(pi) ? `<span class="fun-p">${n} ★</span>` : n;
+  }).join(', ');
+}
+
+function buildTeamBody(m, mi) {
+  const funSet = new Set(m.funPlayers);
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="vs-row">
+      <div class="team-block" id="t1block-${mi}">
+        <div class="team-label">Team 1</div>
+        <div class="team-players">${playerLabel(m.team1, funSet)}</div>
+        <input class="score-input" type="number" min="0" step="1" placeholder="—"
+          id="t1-${mi}" oninput="onTeamScore(${mi})">
+        <div class="result-badge" id="badge1-${mi}" style="display:none"></div>
+        <div class="pts-note" id="pts1-${mi}"></div>
+      </div>
+      <div class="vs-divider">VS</div>
+      <div class="team-block" id="t2block-${mi}">
+        <div class="team-label">Team 2</div>
+        <div class="team-players">${playerLabel(m.team2, funSet)}</div>
+        <input class="score-input" type="number" min="0" step="1" placeholder="—"
+          id="t2-${mi}" oninput="onTeamScore(${mi})">
+        <div class="result-badge" id="badge2-${mi}" style="display:none"></div>
+        <div class="pts-note" id="pts2-${mi}"></div>
+      </div>
+    </div>`;
+  return wrap;
+}
+
+function buildFfaBody(m, mi) {
+  const funSet = new Set(m.funPlayers);
+  const wrap = document.createElement('div');
+  const grid = document.createElement('div');
+  grid.className = 'ffa-grid';
+  m.team1.forEach((pi, i) => {
+    const isFun = funSet.has(pi);
+    const box = document.createElement('div');
+    box.className = 'ffa-player';
+    box.innerHTML = `
+      <div class="fp-name ${isFun ? 'fun-p' : ''}">${NAMES[pi]}${isFun ? ' ★' : ''}</div>
+      <input class="ffa-score" type="number" min="0" step="1" placeholder="score"
+           id="ffa-${mi}-${i}" oninput="onFfaScore(${mi})">
+      ${isFun ? '<div style="color:#888;font-size:12px">for fun – no points</div>' : ''}
+      <div class="ffa-pts" id="ffapts-${mi}-${i}"></div>`;
+    grid.appendChild(box);
+  });
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+let _activeFilter = 'all';
+
+function isMatchScored(mi) {
+  const m = MATCHES[mi];
+  const s = matchScores[mi];
+  if (m.isFfa) {
+    return s.ffa.every(v => v !== null && !isNaN(v) && v !== '');
+  } else {
+    return s.t1 !== null && s.t2 !== null && !isNaN(s.t1) && !isNaN(s.t2);
+  }
+}
+
+function setFilter(filter, btn) {
+  _activeFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilter();
+}
+
+function applyFilter() {
+  MATCHES.forEach((m, mi) => {
+    const card = document.getElementById('mcard-' + mi);
+    if (!card) return;
+    const scored = isMatchScored(mi);
+    let hide = false;
+    if (_activeFilter === 'scored' && !scored) hide = true;
+    if (_activeFilter === 'unscored' && scored) hide = true;
+    card.classList.toggle('card-hidden', hide);
+  });
+}
+
+function buildCards() {
+  const container = document.getElementById('match-cards');
+  MATCHES.forEach((m, mi) => {
+    const card = document.createElement('div');
+    card.className = 'match-card';
+    card.id = 'mcard-' + mi;
+    const hdr = document.createElement('div');
+    hdr.className = 'match-hdr';
+    hdr.innerHTML = `<span class="mname">🎮 ${m.game}</span>
+      <span class="mslot">${m.slotLabel} &nbsp;·&nbsp; ${m.note}</span>`;
+    hdr.onclick = () => toggleBody(mi);
+    const body = document.createElement('div');
+    body.className = 'match-body';
+    body.id = 'mbody-' + mi;
+    body.appendChild(m.isFfa ? buildFfaBody(m, mi) : buildTeamBody(m, mi));
+    card.appendChild(hdr);
+    card.appendChild(body);
+    container.appendChild(card);
+  });
+}
+
+function showBadge(el, text, cls) {
+  el.textContent = text;
+  el.className = 'result-badge ' + cls;
+  el.style.display = 'inline-block';
+}
+
+function onTeamScore(mi) {
+  const m = MATCHES[mi];
+  const t1 = document.getElementById('t1-' + mi).value;
+  const t2 = document.getElementById('t2-' + mi).value;
+  const v1 = t1 === '' ? null : parseFloat(t1);
+  const v2 = t2 === '' ? null : parseFloat(t2);
+  matchScores[mi].t1 = v1;
+  matchScores[mi].t2 = v2;
+  saveScores();
+  recomputeAll();
+  applyFilter();
+
+  const b1 = document.getElementById('badge1-' + mi);
+  const b2 = document.getElementById('badge2-' + mi);
+  const p1 = document.getElementById('pts1-' + mi);
+  const p2 = document.getElementById('pts2-' + mi);
+  const bl1 = document.getElementById('t1block-' + mi);
+  const bl2 = document.getElementById('t2block-' + mi);
+  bl1.className = 'team-block'; bl2.className = 'team-block';
+  b1.style.display = b2.style.display = 'none';
+  p1.textContent = p2.textContent = '';
+
+  if (v1 !== null && v2 !== null && !isNaN(v1) && !isNaN(v2)) {
+    const funSet = new Set(m.funPlayers);
+    const nf1 = m.team1.filter(pi => !funSet.has(pi)).length;
+    const nf2 = m.team2.filter(pi => !funSet.has(pi)).length;
+    if (v1 > v2) {
+      bl1.className = 'team-block winner'; bl2.className = 'team-block loser';
+      showBadge(b1, 'WIN', 'badge-win');   showBadge(b2, 'LOSS', 'badge-loss');
+      if (nf1) p1.textContent = '+2 pts each';
+      if (nf2) p2.textContent = '+0 pts';
+    } else if (v2 > v1) {
+      bl2.className = 'team-block winner'; bl1.className = 'team-block loser';
+      showBadge(b2, 'WIN', 'badge-win');   showBadge(b1, 'LOSS', 'badge-loss');
+      if (nf2) p2.textContent = '+2 pts each';
+      if (nf1) p1.textContent = '+0 pts';
+    } else {
+      bl1.className = 'team-block draw'; bl2.className = 'team-block draw';
+      showBadge(b1, 'DRAW', 'badge-draw'); showBadge(b2, 'DRAW', 'badge-draw');
+      if (nf1) p1.textContent = '+1 pt each';
+      if (nf2) p2.textContent = '+1 pt each';
+    }
+  }
+  updateScheduleStrikethrough();
+}
+
+function onFfaScore(mi) {
+  const m = MATCHES[mi];
+  const funSet = new Set(m.funPlayers);
+  // scores saved below, then applyFilter called
+  matchScores[mi].ffa = m.team1.map((pi, i) => {
+    const el = document.getElementById(`ffa-${mi}-${i}`);
+    if (!el) return null;
+    const v = el.value === '' ? null : parseFloat(el.value);
+    return v;
+  });
+  saveScores();
+  recomputeAll();
+
+  const allP = m.team1
+    .map((pi, i) => ({ pi, i, score: matchScores[mi].ffa[i] }))
+    .filter(x => x.score !== null && !isNaN(x.score));
+  allP.sort((a, b) => b.score - a.score);
+  const n = allP.length;
+  m.team1.forEach((pi, i) => {
+    const el = document.getElementById(`ffapts-${mi}-${i}`);
+    if (el) el.textContent = '';
+  });
+  allP.forEach((x, rank) => {
+    const el = document.getElementById(`ffapts-${mi}-${x.i}`);
+    if (el) {
+      if (funSet.has(x.pi)) {
+        el.textContent = `rank ${rank + 1} (for fun)`;
+      } else {
+        el.textContent = `+${n - 1 - rank} pts (rank ${rank + 1})`;
+      }
+    }
+  });
+  updateScheduleStrikethrough();
+  applyFilter();
+}
+
+function toggleBody(mi) {
+  const body = document.getElementById('mbody-' + mi);
+  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+
+function renderStandings() {
+  recomputeAll();
+  // count total matches and played (scored) matches per player
+  const totalGames = new Array(NAMES.length).fill(0);
+  const playedGames = new Array(NAMES.length).fill(0);
+  MATCHES.forEach((m, mi) => {
+    const allPlayers = m.isFfa ? m.team1 : [...m.team1, ...m.team2];
+    const funSet = new Set(m.funPlayers);
+    const scored = isMatchDone(mi);
+    allPlayers.forEach(pi => {
+      if (funSet.has(pi)) return;
+      totalGames[pi]++;
+      if (scored) playedGames[pi]++;
+    });
+  });
+  const rows = NAMES.map((name, pi) => ({ name, pi, total: playerPts[pi] }));
+  rows.sort((a, b) => b.total - a.total);
+  document.getElementById('stand-body').innerHTML = rows.map((r, i) =>
+    `<tr class="${i === 0 && r.total > 0 ? 'rank1' : ''}">
+      <td>${i + 1}</td><td>${r.name}</td><td>${r.total}</td>
+      <td>${playedGames[r.pi]}/${totalGames[r.pi]}</td>
+    </tr>`
+  ).join('');
+}
+
+function isMatchDone(mi) {
+  const m = MATCHES[mi];
+  const sc = matchScores[mi];
+  if (m.isFfa) {
+    return sc.ffa.every(v => v !== null && !isNaN(v));
+  } else {
+    return sc.t1 !== null && sc.t2 !== null && !isNaN(sc.t1) && !isNaN(sc.t2);
+  }
+}
+
+function updateScheduleStrikethrough() {
+  document.querySelectorAll('#schedule tbody tr[data-mi]').forEach(tr => {
+    tr.classList.toggle('match-done', isMatchDone(parseInt(tr.dataset.mi)));
+  });
+  updateRecommendations();
+}
+
+const playerFree = new Array(NAMES.length).fill(true);
+
+function buildPlayerButtons() {
+  const container = document.getElementById('player-btns');
+  NAMES.forEach((name, pi) => {
+    const btn = document.createElement('button');
+    btn.className = 'player-btn free';
+    btn.id = 'pbtn-' + pi;
+    btn.textContent = name;
+    btn.onclick = () => {
+      playerFree[pi] = !playerFree[pi];
+      btn.className = 'player-btn ' + (playerFree[pi] ? 'free' : 'busy');
+      updateRecommendations();
+    };
+    container.appendChild(btn);
+  });
+}
+
+function updateRecommendations() {
+  const recEl = document.getElementById('recommendations');
+  const freeSet = new Set();
+  NAMES.forEach((_, pi) => { if (playerFree[pi]) freeSet.add(pi); });
+  const playable = [];
+  MATCHES.forEach((m, mi) => {
+    if (isMatchDone(mi)) return;
+    const allPlayers = m.isFfa ? [...m.team1] : [...m.team1, ...m.team2];
+    if (allPlayers.every(pi => freeSet.has(pi))) {
+      playable.push({ mi, m });
+    }
+  });
+  if (playable.length === 0) {
+    recEl.style.display = 'block';
+    recEl.innerHTML = '<p style="color:#888;margin:0;font-size:12px;">No remaining matches for the currently free players.</p>';
+  } else {
+    recEl.style.display = 'block';
+    recEl.innerHTML = '<div style="font-weight:bold;font-size:12px;color:var(--blue);margin-bottom:6px;">💡 Recommended matches to play now:</div>' +
+      playable.map(x => {
+        const players = x.m.isFfa
+          ? x.m.team1.map(pi => NAMES[pi]).join(', ')
+          : x.m.team1.map(pi => NAMES[pi]).join(', ') + ' <span style="color:#888">vs</span> ' + x.m.team2.map(pi => NAMES[pi]).join(', ');
+        return '<div class="rec-match">🎮 <b>' + x.m.game + '</b> <span style="color:#666;font-size:11px">(' + x.m.slotLabel + ' · ' + x.m.note + ')</span><br><span style="margin-left:20px">' + players + '</span></div>';
+      }).join('');
+  }
+}
+
+buildCards();
+buildPlayerButtons();
+renderScheduleTable();
+
+// ─── In-browser scheduler (JS port of scheduler.py) ─────────────────────────
+// Seedable PRNG (mulberry32) so seed/team-seed are reproducible per device.
+let _rngState = 0;
+function setSeed(s) { _rngState = (s >>> 0) || 1; }
+function rand() {
+  // mulberry32
+  _rngState = (_rngState + 0x6D2B79F5) >>> 0;
+  let t = _rngState;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function randInt(n) { return Math.floor(rand() * n); }
+function shuffleArr(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function combinations(arr, k) {
+  // Iterative C(n,k) generator → returns list of index-tuples (as arrays).
+  const out = [];
+  const n = arr.length;
+  if (k < 0 || k > n) return out;
+  const idx = new Array(k);
+  for (let i = 0; i < k; i++) idx[i] = i;
+  while (true) {
+    out.push(idx.map(i => arr[i]));
+    let i = k - 1;
+    while (i >= 0 && idx[i] === i + n - k) i--;
+    if (i < 0) break;
+    idx[i]++;
+    for (let j = i + 1; j < k; j++) idx[j] = idx[j - 1] + 1;
+  }
+  return out;
+}
+
+function _playersIn(inst) {
+  const s = new Set(inst.team1);
+  for (const p of inst.team2) s.add(p);
+  return s;
+}
+
+function _planMatchSizes(A, validSizes, preferredSize) {
+  if (A <= 0 || validSizes.length === 0) return [];
+  const maxSum = A + Math.max.apply(null, validSizes);
+  // dp[total] = array of sizes summing to total, with minimal score, or null.
+  const dp = new Array(maxSum + 1).fill(null);
+  dp[0] = [];
+  function score(plan) {
+    const n = plan.length;
+    let nonPref = 0, dist = 0;
+    for (const s of plan) {
+      if (s !== preferredSize) nonPref++;
+      dist += Math.abs(s - preferredSize);
+    }
+    return [nonPref, n, dist];
+  }
+  function cmp(a, b) {
+    for (let i = 0; i < 3; i++) {
+      if (a[i] !== b[i]) return a[i] - b[i];
+    }
+    return 0;
+  }
+  for (let total = 1; total <= maxSum; total++) {
+    let best = null, bestScore = null;
+    for (const sz of validSizes) {
+      if (sz > total) continue;
+      const prev = dp[total - sz];
+      if (prev === null) continue;
+      const cand = prev.concat([sz]);
+      const sc = score(cand);
+      if (bestScore === null || cmp(sc, bestScore) < 0) {
+        best = cand;
+        bestScore = sc;
+      }
+    }
+    dp[total] = best;
+  }
+  for (let total = A; total <= maxSum; total++) {
+    if (dp[total] !== null) return dp[total].slice();
+  }
+  return [];
+}
+
+function _pickRepeats(eligible, nNeeded, repeatCounts) {
+  const pool = eligible.slice();
+  pool.sort((a, b) => {
+    const ra = repeatCounts[a] || 0;
+    const rb = repeatCounts[b] || 0;
+    if (ra !== rb) return ra - rb;
+    return rand() - 0.5;
+  });
+  const chosen = pool.slice(0, nNeeded);
+  for (const r of chosen) repeatCounts[r] = (repeatCounts[r] || 0) + 1;
+  return chosen;
+}
+
+function _splitMatchByTeams(entries, sizeSmall, sizeBig) {
+  const byTeam = new Map();
+  const singletons = [];
+  for (const [p, t] of entries) {
+    if (t) {
+      if (!byTeam.has(t)) byTeam.set(t, []);
+      byTeam.get(t).push(p);
+    } else {
+      singletons.push(p);
+    }
+  }
+  const sides = [[], []];
+  const cap = [sizeSmall, sizeBig];
+  const groups = Array.from(byTeam.values()).sort((a, b) => b.length - a.length);
+  for (const grp of groups) {
+    const fits = [];
+    if (cap[0] >= grp.length) fits.push(0);
+    if (cap[1] >= grp.length) fits.push(1);
+    let i;
+    if (fits.length) {
+      i = fits.reduce((acc, x) => cap[x] > cap[acc] ? x : acc, fits[0]);
+    } else {
+      i = cap[0] >= cap[1] ? 0 : 1;
+    }
+    const takeN = Math.min(grp.length, cap[i]);
+    for (let k = 0; k < takeN; k++) sides[i].push(grp[k]);
+    cap[i] -= takeN;
+    const leftover = grp.slice(takeN);
+    if (leftover.length) {
+      const j = 1 - i;
+      const takeJ = Math.min(leftover.length, cap[j]);
+      for (let k = 0; k < takeJ; k++) sides[j].push(leftover[k]);
+      cap[j] -= takeJ;
+    }
+  }
+  shuffleArr(singletons);
+  for (const p of singletons) {
+    if (cap[0] >= cap[1] && cap[0] > 0) { sides[0].push(p); cap[0]--; }
+    else if (cap[1] > 0) { sides[1].push(p); cap[1]--; }
+  }
+  shuffleArr(sides[0]);
+  shuffleArr(sides[1]);
+  return [sides[0], sides[1]];
+}
+
+function _buildTeamRound(gname, order, A, minP, maxP, prefP, teamsByIdx, repeatCounts) {
+  const validSizes = [];
+  for (let s = 2 * minP; s <= 2 * maxP; s++) {
+    const h1 = Math.floor(s / 2);
+    const h2 = s - h1;
+    if (minP <= h1 && h2 <= maxP) validSizes.push(s);
+  }
+  let plan = _planMatchSizes(A, validSizes, 2 * prefP);
+  if (plan.length === 0) return [];
+  const funPad = plan.reduce((a, b) => a + b, 0) - A;
+  plan.sort((a, b) => b - a);
+  const isBig = maxP >= 3;
+  const lastIdx = plan.length - 1;
+
+  const byTeam = new Map();
+  const singletons = [];
+  for (const p of order) {
+    const t = teamsByIdx[p];
+    if (t) {
+      if (!byTeam.has(t)) byTeam.set(t, []);
+      byTeam.get(t).push(p);
+    } else {
+      singletons.push(p);
+    }
+  }
+  const namedGroups = Array.from(byTeam.entries())
+    .sort((a, b) => b[1].length - a[1].length);
+
+  const matchEntries = plan.map(() => []);
+  const capacity = plan.slice();
+  capacity[capacity.length - 1] -= funPad;
+
+  function placeGroup(members, tag) {
+    let remaining = members.slice();
+    while (remaining.length) {
+      const fits = [];
+      for (let i = 0; i < capacity.length; i++) {
+        if (capacity[i] >= remaining.length) fits.push(i);
+      }
+      if (fits.length) {
+        let i = fits[0];
+        for (const f of fits) if (capacity[f] < capacity[i]) i = f;
+        for (const p of remaining) matchEntries[i].push([p, tag]);
+        capacity[i] -= remaining.length;
+        remaining = [];
+      } else {
+        let i = 0;
+        for (let k = 1; k < capacity.length; k++) if (capacity[k] > capacity[i]) i = k;
+        if (capacity[i] <= 0) throw new Error('Capacity exhausted for ' + gname);
+        const take = remaining.slice(0, capacity[i]);
+        for (const p of take) matchEntries[i].push([p, tag]);
+        capacity[i] -= take.length;
+        remaining = remaining.slice(take.length);
+      }
+    }
+  }
+
+  for (const [tname, members] of namedGroups) placeGroup(members, tname);
+  for (const p of singletons) placeGroup([p], null);
+
+  const instances = [];
+  const cleanUsed = [];
+
+  for (let i = 0; i < plan.length; i++) {
+    const size = plan[i];
+    const entries = matchEntries[i];
+    const halfSmall = Math.floor(size / 2);
+    const halfBig = size - halfSmall;
+    let funSet, note;
+    if (i === lastIdx && funPad > 0) {
+      const repeats = _pickRepeats(cleanUsed, funPad, repeatCounts);
+      for (const p of repeats) entries.push([p, teamsByIdx[p] || null]);
+      funSet = new Set(repeats);
+      note = halfSmall + 'v' + halfBig;
+      if (funSet.size) note += ' (extra-player match – repeats play for fun)';
+    } else {
+      funSet = new Set();
+      note = halfSmall + 'v' + halfBig;
+      for (const [p, _] of entries) cleanUsed.push(p);
+    }
+    const [team1, team2] = _splitMatchByTeams(entries, halfSmall, halfBig);
+    instances.push({
+      game: gname, team1: team1, team2: team2,
+      is_4v4: isBig, is_ffa: false,
+      fun_players: Array.from(funSet),
+      note: note,
+    });
+  }
+  return instances;
+}
+
+function _buildFfaRound(gname, order, A, minP, maxP, prefP, repeatCounts) {
+  const validSizes = [];
+  for (let s = minP; s <= maxP; s++) validSizes.push(s);
+  let plan = _planMatchSizes(A, validSizes, prefP);
+  if (plan.length === 0) return [];
+  const funPad = plan.reduce((a, b) => a + b, 0) - A;
+  plan.sort((a, b) => b - a);
+  const instances = [];
+  let cursor = 0;
+  const cleanUsed = [];
+  const lastIdx = plan.length - 1;
+  for (let i = 0; i < plan.length; i++) {
+    const size = plan[i];
+    if (i === lastIdx && funPad > 0) {
+      const nReal = size - funPad;
+      const real = order.slice(cursor, cursor + nReal);
+      cursor += nReal;
+      const repeats = _pickRepeats(cleanUsed, funPad, repeatCounts);
+      const grp = real.concat(repeats);
+      shuffleArr(grp);
+      const funSet = new Set(repeats);
+      let note = size + '-player FFA';
+      if (funSet.size) note += ' (extra-player match – repeats play for fun)';
+      instances.push({
+        game: gname, team1: grp, team2: [],
+        is_4v4: false, is_ffa: true,
+        fun_players: Array.from(funSet), note: note,
+      });
+    } else {
+      const grp = order.slice(cursor, cursor + size);
+      cursor += size;
+      shuffleArr(grp);
+      for (const p of grp) cleanUsed.push(p);
+      instances.push({
+        game: gname, team1: grp, team2: [],
+        is_4v4: false, is_ffa: true,
+        fun_players: [], note: size + '-player FFA',
+      });
+    }
+  }
+  return instances;
+}
+
+function _roundRobinPairs(nTeams, roundIdx) {
+  if (nTeams < 2) return [];
+  const teams = [];
+  for (let i = 0; i < nTeams; i++) teams.push(i);
+  let bye = null;
+  if (teams.length % 2 === 1) { bye = -1; teams.push(bye); }
+  const n = teams.length;
+  const cycle = n - 1;
+  const r = ((roundIdx % cycle) + cycle) % cycle;
+  const rotating = teams.slice(1);
+  const rotated = r ? rotating.slice(-r).concat(rotating.slice(0, -r)) : rotating;
+  const arr = [teams[0]].concat(rotated);
+  const pairs = [];
+  for (let i = 0; i < n / 2; i++) {
+    const a = arr[i], b = arr[n - 1 - i];
+    if (a === bye || b === bye) continue;
+    pairs.push([Math.min(a, b), Math.max(a, b)]);
+  }
+  return pairs;
+}
+
+function _cloneMatch(m) {
+  return {
+    game: m.game,
+    team1: m.team1.slice(),
+    team2: m.team2.slice(),
+    is_4v4: m.is_4v4, is_ffa: m.is_ffa,
+    fun_players: m.fun_players.slice(),
+    note: m.note,
+    keep_teams: !!m.keep_teams,
+  };
+}
+
+function _roundRobinRounds(primary, gname, nRounds) {
+  const buckets = new Map();
+  const fixedMatches = [];
+  for (const m of primary) {
+    if (m.is_ffa || m.team1.length !== m.team2.length) {
+      fixedMatches.push(m);
+    } else {
+      const fp = new Set(m.fun_players);
+      const size = m.team1.length;
+      if (!buckets.has(size)) buckets.set(size, []);
+      for (const side of [m.team1, m.team2]) {
+        const fun = side.filter(p => fp.has(p));
+        buckets.get(size).push({
+          players: side.slice(),
+          fun: fun,
+          is_4v4: m.is_4v4,
+        });
+      }
+    }
+  }
+  const all = [];
+  for (let roundIdx = 0; roundIdx < nRounds; roundIdx++) {
+    for (const [size, teams] of buckets) {
+      for (const [i, j] of _roundRobinPairs(teams.length, roundIdx)) {
+        const ta = teams[i], tb = teams[j];
+        const funSet = ta.fun.concat(tb.fun);
+        let note = size + 'v' + size;
+        if (funSet.length) note += ' (extra-player match – repeats play for fun)';
+        all.push({
+          game: gname,
+          team1: ta.players.slice(),
+          team2: tb.players.slice(),
+          is_4v4: ta.is_4v4, is_ffa: false,
+          fun_players: funSet.slice(),
+          note: note,
+          keep_teams: true,
+        });
+      }
+    }
+    for (const m of fixedMatches) {
+      const c = _cloneMatch(m);
+      c.keep_teams = true;
+      all.push(c);
+    }
+  }
+  return all;
+}
+
+function buildInstances(nPlayers, games, teamsByIdx) {
+  teamsByIdx = teamsByIdx || {};
+  const players = [];
+  for (let i = 0; i < nPlayers; i++) players.push(i);
+  const repeatCounts = {};  // gname → {playerIdx: count}
+  const instances = [];
+  for (const g of games) {
+    const gname = g.name;
+    if (!repeatCounts[gname]) repeatCounts[gname] = {};
+    const rc = repeatCounts[gname];
+    const order = players.slice();
+    shuffleArr(order);
+    const A = order.length;
+    if (A < g.min_players * (g.ffa ? 1 : 2)) continue;
+    const primary = g.ffa
+      ? _buildFfaRound(gname, order, A, g.min_players, g.max_players, g.preferred_players, rc)
+      : _buildTeamRound(gname, order, A, g.min_players, g.max_players, g.preferred_players, teamsByIdx, rc);
+    if (g.repeat_teams && g.repeat_game > 1) {
+      const rounds = _roundRobinRounds(primary, gname, g.repeat_game);
+      for (const m of rounds) instances.push(m);
+    } else {
+      for (const m of primary) instances.push(m);
+      for (let k = 1; k < (g.repeat_game || 1); k++) {
+        const orderK = players.slice();
+        shuffleArr(orderK);
+        const repeat = g.ffa
+          ? _buildFfaRound(gname, orderK, orderK.length, g.min_players, g.max_players, g.preferred_players, rc)
+          : _buildTeamRound(gname, orderK, orderK.length, g.min_players, g.max_players, g.preferred_players, teamsByIdx, rc);
+        for (const m of repeat) instances.push(m);
+      }
+    }
+  }
+  return instances;
+}
+
+function scheduleSlots(instances) {
+  const N = instances.length;
+  const psets = instances.map(_playersIn);
+  const adj = [];
+  for (let i = 0; i < N; i++) adj.push(new Set());
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      let share = false;
+      for (const p of psets[i]) { if (psets[j].has(p)) { share = true; break; } }
+      if (share || instances[i].game === instances[j].game) {
+        adj[i].add(j); adj[j].add(i);
+      }
+    }
+  }
+  const color = new Array(N).fill(-1);
+  const sat = new Array(N).fill(0);
+  const deg = adj.map(a => a.size);
+  for (let step = 0; step < N; step++) {
+    let best = -1, bestKey = [-1, -1];
+    for (let i = 0; i < N; i++) {
+      if (color[i] >= 0) continue;
+      const key = [sat[i], deg[i]];
+      if (key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) {
+        best = i; bestKey = key;
+      }
+    }
+    const neighborColors = new Set();
+    for (const j of adj[best]) if (color[j] >= 0) neighborColors.add(color[j]);
+    let c = 0;
+    while (neighborColors.has(c)) c++;
+    color[best] = c;
+    for (const j of adj[best]) {
+      if (color[j] < 0) {
+        const s = new Set();
+        for (const k of adj[j]) if (color[k] >= 0) s.add(color[k]);
+        sat[j] = s.size;
+      }
+    }
+  }
+  const nColors = color.length ? Math.max.apply(null, color) + 1 : 0;
+  const slots = [];
+  for (let i = 0; i < nColors; i++) slots.push([]);
+  for (let i = 0; i < N; i++) slots[color[i]].push(instances[i]);
+  return slots.filter(s => s.length);
+}
+
+function shuffleTeamsJs(slots, teamSeed, teamsByIdx, diversityWeight) {
+  if (diversityWeight === undefined) diversityWeight = 1.0;
+  teamsByIdx = teamsByIdx || {};
+  // Use a fresh PRNG seeded from teamSeed.
+  const savedState = _rngState;
+  setSeed(teamSeed || 1);
+  const co = new Map();
+  function key(a, b) { return a < b ? (a + ',' + b) : (b + ',' + a); }
+  function scoreTeam(team) {
+    let s = 0;
+    for (let i = 0; i < team.length; i++) {
+      for (let j = i + 1; j < team.length; j++) {
+        s += (co.get(key(team[i], team[j])) || 0);
+      }
+    }
+    return s;
+  }
+  function updateCo(team) {
+    for (let i = 0; i < team.length; i++) {
+      for (let j = i + 1; j < team.length; j++) {
+        const k = key(team[i], team[j]);
+        co.set(k, (co.get(k) || 0) + 1);
+      }
+    }
+  }
+  function splitsNamedTeam(t1, t2) {
+    const n1 = new Set(); const n2 = new Set();
+    for (const p of t1) if (teamsByIdx[p]) n1.add(teamsByIdx[p]);
+    for (const p of t2) if (teamsByIdx[p]) n2.add(teamsByIdx[p]);
+    for (const x of n1) if (n2.has(x)) return true;
+    return false;
+  }
+  function sampledSplit(pool) {
+    const half = Math.floor(pool.length / 2);
+    let fixed = pool[0];
+    for (const p of pool) if (p < fixed) fixed = p;
+    const rest = pool.filter(p => p !== fixed);
+    const combos = combinations(rest, half - 1);
+    const candidates = [];
+    const scores = [];
+    for (const combo of combos) {
+      const t1 = [fixed].concat(combo);
+      const set1 = new Set(t1);
+      const t2 = pool.filter(p => !set1.has(p));
+      if (splitsNamedTeam(t1, t2)) continue;
+      candidates.push([t1, t2]);
+      scores.push(scoreTeam(t1) + scoreTeam(t2));
+    }
+    if (!candidates.length) {
+      // Fall back: allow named-team splits.
+      for (const combo of combos) {
+        const t1 = [fixed].concat(combo);
+        const set1 = new Set(t1);
+        const t2 = pool.filter(p => !set1.has(p));
+        candidates.push([t1, t2]);
+        scores.push(scoreTeam(t1) + scoreTeam(t2));
+      }
+    }
+    const minS = Math.min.apply(null, scores);
+    const weights = scores.map(s => Math.exp(-(s - minS) * diversityWeight));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = rand() * total;
+    let chosen = candidates[candidates.length - 1];
+    let cum = 0;
+    for (let i = 0; i < candidates.length; i++) {
+      cum += weights[i];
+      if (r <= cum) { chosen = candidates[i]; break; }
+    }
+    const [t1, t2] = chosen;
+    shuffleArr(t1); shuffleArr(t2);
+    return [t1, t2];
+  }
+  const newSlots = [];
+  for (const slot of slots) {
+    const newSlot = [];
+    for (let inst of slot) {
+      inst = Object.assign({}, inst);
+      if (inst.keep_teams) {
+        if (!inst.is_ffa) { updateCo(inst.team1); updateCo(inst.team2); }
+      } else if (inst.is_ffa) {
+        const pool = inst.team1.slice(); shuffleArr(pool);
+        inst.team1 = pool;
+      } else {
+        const pool = inst.team1.concat(inst.team2);
+        const [t1, t2] = sampledSplit(pool);
+        inst.team1 = t1; inst.team2 = t2;
+        updateCo(t1); updateCo(t2);
+      }
+      newSlot.push(inst);
+    }
+    newSlots.push(newSlot);
+  }
+  _rngState = savedState;
+  return newSlots;
+}
+
+function evaluateSlots(slots, nPlayers) {
+  const idles = [];
+  for (const s of slots) {
+    const busy = new Set();
+    for (const inst of s) for (const p of _playersIn(inst)) busy.add(p);
+    idles.push(nPlayers - busy.size);
+  }
+  const maxIdle = idles.length ? Math.max.apply(null, idles) : 0;
+  const sumIdle = idles.reduce((a, b) => a + b, 0);
+  return [slots.length, maxIdle, sumIdle];
+}
+
+function cmpScore(a, b) {
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+}
+
+function _gamesListFromConfig(cfg) {
+  const out = [];
+  const games = cfg.games || {};
+  for (const name of Object.keys(games)) {
+    const g = games[name] || {};
+    const maxP = parseInt(g.max_players, 10);
+    if (!Number.isFinite(maxP) || maxP < 1) {
+      throw new Error('Game "' + name + '" needs a valid max_players.');
+    }
+    const minP = Number.isFinite(parseInt(g.min_players, 10)) ? parseInt(g.min_players, 10) : maxP;
+    const prefP = Number.isFinite(parseInt(g.preferred_players, 10)) ? parseInt(g.preferred_players, 10) : maxP;
+    const rep = Number.isFinite(parseInt(g.repeat_game, 10)) ? Math.max(1, parseInt(g.repeat_game, 10)) : 1;
+    out.push({
+      name: name,
+      min_players: minP,
+      max_players: maxP,
+      preferred_players: prefP,
+      ffa: !!g.ffa,
+      repeat_game: rep,
+      repeat_teams: !!g.repeat_teams,
+    });
+  }
+  return out;
+}
+
+function runScheduler(cfg, opts) {
+  opts = opts || {};
+  const nSeeds = opts.nSeeds || 500;
+  const names = Object.keys(cfg.players || {});
+  if (!names.length) throw new Error('No players configured.');
+  const games = _gamesListFromConfig(cfg);
+  if (!games.length) throw new Error('No games configured.');
+  // Build name → index then index → team-name map.
+  const teamsByIdx = {};
+  names.forEach((n, i) => {
+    const p = cfg.players[n] || {};
+    const t = (p.team || '').trim();
+    if (t && t.toLowerCase() !== 'random') teamsByIdx[i] = t;
+  });
+  // Validate: no named team larger than the largest game's max_players.
+  const teamCounts = {};
+  for (const i of Object.keys(teamsByIdx)) {
+    const t = teamsByIdx[i];
+    teamCounts[t] = (teamCounts[t] || 0) + 1;
+  }
+  const biggestMax = Math.max.apply(null, games.map(g => g.max_players));
+  for (const t of Object.keys(teamCounts)) {
+    if (teamCounts[t] > biggestMax) {
+      throw new Error('Team "' + t + '" has ' + teamCounts[t] +
+        ' players, more than the largest game max_players (' + biggestMax + ').');
+    }
+  }
+
+  let bestScore = null, bestSlots = null, bestSeed = 0;
+  let userSeed = (opts.seed === undefined || opts.seed === null) ? null : (opts.seed | 0);
+  if (userSeed !== null) {
+    setSeed(userSeed);
+    const inst = buildInstances(names.length, games, teamsByIdx);
+    bestSlots = scheduleSlots(inst);
+    bestSeed = userSeed;
+    bestScore = evaluateSlots(bestSlots, names.length);
+  } else {
+    for (let s = 0; s < nSeeds; s++) {
+      setSeed(s + 1);  // avoid 0 for mulberry32
+      const inst = buildInstances(names.length, games, teamsByIdx);
+      const slots = scheduleSlots(inst);
+      const score = evaluateSlots(slots, names.length);
+      if (bestScore === null || cmpScore(score, bestScore) < 0) {
+        bestScore = score; bestSlots = slots; bestSeed = s + 1;
+      }
+    }
+  }
+  const teamSeed = (opts.teamSeed === undefined || opts.teamSeed === null)
+    ? Math.floor(Math.random() * 100000)
+    : (opts.teamSeed | 0);
+  bestSlots = shuffleTeamsJs(bestSlots, teamSeed, teamsByIdx);
+  // Flatten slots to matches[] with slotIdx + slotLabel.
+  const matches = [];
+  bestSlots.forEach((slot, si) => {
+    for (const inst of slot) {
+      matches.push({
+        game: inst.game,
+        note: inst.note,
+        slotIdx: si + 1,
+        slotLabel: 'Slot ' + (si + 1),
+        isFfa: !!inst.is_ffa,
+        team1: inst.team1.slice(),
+        team2: inst.team2 ? inst.team2.slice() : [],
+        funPlayers: (inst.fun_players || []).slice(),
+      });
+    }
+  });
+  return {
+    names: names, matches: matches, slots: bestSlots,
+    seed: bestSeed, teamSeed: teamSeed,
+  };
+}
+
+// ─── Schedule table renderer ────────────────────────────────────────────────
+function escText(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderScheduleTable() {
+  // Group matches by slotIdx for the "sitting out" / slot-num display.
+  const slotMap = new Map();
+  MATCHES.forEach((m, mi) => {
+    if (!slotMap.has(m.slotIdx)) slotMap.set(m.slotIdx, []);
+    slotMap.get(m.slotIdx).push(mi);
+  });
+  const rows = [];
+  const slotIndices = Array.from(slotMap.keys()).sort((a, b) => a - b);
+  for (const si of slotIndices) {
+    const miList = slotMap.get(si);
+    const busy = new Set();
+    for (const mi of miList) {
+      const m = MATCHES[mi];
+      for (const p of m.team1) busy.add(p);
+      for (const p of m.team2) busy.add(p);
+    }
+    const sitting = NAMES
+      .map((n, i) => busy.has(i) ? null : n)
+      .filter(x => x !== null)
+      .join(', ') || '—';
+    let first = true;
+    for (const mi of miList) {
+      const m = MATCHES[mi];
+      const funSet = new Set(m.funPlayers);
+      const funNames = m.funPlayers.map(i => NAMES[i]).join(', ');
+      function fmtTeam(idxList) {
+        return idxList.map(i => funSet.has(i)
+          ? '<span class="fun">' + escText(NAMES[i]) + ' ★</span>'
+          : escText(NAMES[i])).join(', ');
+      }
+      let teamsHtml;
+      if (m.isFfa) {
+        teamsHtml = "<td colspan='2'>" + fmtTeam(m.team1) + "</td>";
+      } else {
+        teamsHtml = '<td>' + fmtTeam(m.team1) + '</td><td>' + fmtTeam(m.team2) + '</td>';
+      }
+      const funCell = funNames
+        ? '<td class="fun-cell">' + escText(funNames) + '</td>'
+        : '<td>—</td>';
+      rows.push(
+        "<tr data-mi='" + mi + "'>" +
+          "<td class='slot-num'>" + (first ? si : '') + '</td>' +
+          '<td><b>' + escText(m.game) + '</b></td>' +
+          "<td class='fmt'>" + escText(m.note) + '</td>' +
+          teamsHtml +
+          funCell +
+          "<td class='sit-cell'>" + (first ? escText(sitting) : '') + '</td>' +
+        '</tr>'
+      );
+      first = false;
+    }
+  }
+  const tbody = document.getElementById('sched-body');
+  if (tbody) tbody.innerHTML = rows.join('\n');
+  updateScheduleStrikethrough();
+}
+
+function applyScheduleResult(result) {
+  NAMES = result.names.slice();
+  MATCHES = result.matches.map(m => ({
+    game: m.game, note: m.note,
+    slotIdx: m.slotIdx, slotLabel: m.slotLabel,
+    isFfa: m.isFfa,
+    team1: m.team1.slice(), team2: m.team2.slice(),
+    funPlayers: m.funPlayers.slice(),
+  }));
+  STORAGE_KEY = computeStorageKey(MATCHES);
+  playerPts = new Array(NAMES.length).fill(0);
+  matchScores = MATCHES.map(m => m.isFfa
+    ? { ffa: m.team1.map(() => null) }
+    : { t1: null, t2: null });
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  // Rebuild UI pieces that depend on NAMES/MATCHES.
+  document.getElementById('player-btns').innerHTML = '';
+  document.getElementById('match-cards').innerHTML = '';
+  // Reset per-player free state.
+  playerFree.length = 0;
+  for (let i = 0; i < NAMES.length; i++) playerFree.push(true);
+  buildCards();
+  buildPlayerButtons();
+  renderScheduleTable();
+  renderStandings();
+  applyFilter();
+}
+
+// ─── Setup tab ──────────────────────────────────────────────────────────────
+let _setupLoaded = false;
+let _setupBusy = false;
+
+function setupMsg(kind, text) {
+  const el = document.getElementById('setup-msg');
+  el.className = kind;
+  el.textContent = text;
+  if (!text) el.classList.add('hidden');
+}
+
+function setupLoad(force) {
+  if (_setupLoaded && !force) return;
+  // 1) Local override (most recent edits made on this device).
+  let localCfg = null;
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (raw) localCfg = JSON.parse(raw);
+  } catch(e) {}
+  // 2) Try the server (so changes on disk are reflected). Fall back silently.
+  setupMsg('info', 'Loading config…');
+  const serverPromise = fetch('/api/config', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
+  serverPromise.then(serverCfg => {
+    const cfg = localCfg || serverCfg || INITIAL_CONFIG;
+    _setupLoaded = true;
+    setupRender(cfg);
+    if (serverCfg) {
+      setupMsg('', '');
+    } else if (localCfg) {
+      setupMsg('info', 'Loaded from this device (server unavailable).');
+    } else {
+      setupMsg('info', 'Loaded baked-in defaults (server unavailable, no local edits).');
+    }
+  });
+}
+
+function setupRender(cfg) {
+  // Players
+  const ptbody = document.querySelector('#players-table tbody');
+  ptbody.innerHTML = '';
+  const players = cfg.players || {};
+  Object.keys(players).forEach(name => {
+    const p = players[name] || {};
+    setupAddPlayerRow(name, p.team || '');
+  });
+
+  // Games
+  const gtbody = document.querySelector('#games-table tbody');
+  gtbody.innerHTML = '';
+  const games = cfg.games || {};
+  Object.keys(games).forEach(name => {
+    const g = games[name] || {};
+    setupAddGameRow(name, g);
+  });
+}
+
+function setupAddPlayer() {
+  setupAddPlayerRow('', '');
+}
+
+function setupAddPlayerRow(name, team) {
+  const tbody = document.querySelector('#players-table tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><input type="text" class="name-input p-name" value="' + escAttr(name) + '"></td>' +
+    '<td><input type="text" class="team-input p-team" value="' + escAttr(team) +
+       '" placeholder="(random)"></td>' +
+    '<td><button class="row-del" title="Remove player">×</button></td>';
+  tr.querySelector('.row-del').onclick = () => tr.remove();
+  tbody.appendChild(tr);
+}
+
+function setupAddGame() {
+  setupAddGameRow('', {});
+}
+
+function setupAddGameRow(name, g) {
+  const tbody = document.querySelector('#games-table tbody');
+  const tr = document.createElement('tr');
+  const maxP = (g.max_players !== undefined && g.max_players !== null) ? g.max_players : '';
+  const minP = (g.min_players !== undefined && g.min_players !== null) ? g.min_players : '';
+  const prefP = (g.preferred_players !== undefined && g.preferred_players !== null) ? g.preferred_players : '';
+  const rep = (g.repeat_game !== undefined && g.repeat_game !== null) ? g.repeat_game : 1;
+  const ffa = g.ffa === true;
+  const keep = g.repeat_teams === true;
+  tr.innerHTML =
+    '<td><input type="text" class="name-input g-name" value="' + escAttr(name) + '"></td>' +
+    '<td><input type="number" class="num-input g-min" min="1" value="' + escAttr(minP) + '"></td>' +
+    '<td><input type="number" class="num-input g-max" min="1" value="' + escAttr(maxP) + '"></td>' +
+    '<td><input type="number" class="num-input g-pref" min="1" value="' + escAttr(prefP) + '"></td>' +
+    '<td class="checkbox-cell"><input type="checkbox" class="g-ffa"' + (ffa ? ' checked' : '') + '></td>' +
+    '<td><input type="number" class="num-input g-rep" min="1" value="' + escAttr(rep) + '"></td>' +
+    '<td class="checkbox-cell"><input type="checkbox" class="g-keep"' + (keep ? ' checked' : '') + '></td>' +
+    '<td><button class="row-del" title="Remove game">×</button></td>';
+  tr.querySelector('.row-del').onclick = () => tr.remove();
+  tbody.appendChild(tr);
+}
+
+function setupGather() {
+  const players = {};
+  document.querySelectorAll('#players-table tbody tr').forEach(tr => {
+    const name = tr.querySelector('.p-name').value.trim();
+    if (!name) return;
+    const team = tr.querySelector('.p-team').value.trim();
+    const entry = {};
+    if (team && team.toLowerCase() !== 'random') entry.team = team;
+    players[name] = Object.keys(entry).length ? entry : null;
+  });
+
+  const games = {};
+  document.querySelectorAll('#games-table tbody tr').forEach(tr => {
+    const name = tr.querySelector('.g-name').value.trim();
+    if (!name) return;
+    const entry = {};
+    const numFields = [['g-max','max_players'],['g-min','min_players'],
+                       ['g-pref','preferred_players'],['g-rep','repeat_game']];
+    numFields.forEach(([cls, key]) => {
+      const v = tr.querySelector('.' + cls).value;
+      if (v !== '') entry[key] = parseInt(v, 10);
+    });
+    if (tr.querySelector('.g-ffa').checked) entry.ffa = true;
+    if (tr.querySelector('.g-keep').checked) entry.repeat_teams = true;
+    games[name] = entry;
+  });
+
+  return { players: players, games: games };
+}
+
+function setupValidateLocal(cfg) {
+  const errs = [];
+  if (Object.keys(cfg.players).length === 0) errs.push('At least one player is required.');
+  if (Object.keys(cfg.games).length === 0) errs.push('At least one game is required.');
+  Object.entries(cfg.games).forEach(([gn, g]) => {
+    if (g.max_players === undefined || g.max_players === null || isNaN(g.max_players)) {
+      errs.push('Game "' + gn + '": max_players is required.');
+    }
+  });
+  return errs;
+}
+
+function setupSave() {
+  if (_setupBusy) return;
+  const cfg = setupGather();
+  const errs = setupValidateLocal(cfg);
+  if (errs.length) { setupMsg('err', errs.join('\n')); return; }
+  // Always persist locally so the phone keeps the edits even with no server.
+  try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg)); } catch(e) {}
+  _setupBusy = true;
+  setupMsg('info', 'Saving config…');
+  fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cfg),
+  })
+    .then(async r => {
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.error || ('HTTP ' + r.status));
+      return body;
+    })
+    .then(() => setupMsg('ok', 'Config saved to disk and this device. Click Regenerate to rebuild the schedule.'))
+    .catch(err => setupMsg('ok',
+      'Config saved on this device (server unavailable: ' + err.message +
+      '). Click Regenerate to rebuild the schedule.'))
+    .finally(() => { _setupBusy = false; });
+}
+
+function setupRegenerate() {
+  if (_setupBusy) return;
+  const cfg = setupGather();
+  const errs = setupValidateLocal(cfg);
+  if (errs.length) { setupMsg('err', errs.join('\n')); return; }
+  if (!confirm('Regenerate the tournament?\n\nThis will rebuild the schedule and erase any match scores you have already entered.')) return;
+  // Persist edits locally first.
+  try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg)); } catch(e) {}
+  _setupBusy = true;
+  setupMsg('info', 'Regenerating tournament in browser…');
+  // Defer to next tick so the message paints before the blocking search.
+  setTimeout(() => {
+    try {
+      const result = runScheduler(cfg, { nSeeds: 500 });
+      // Clear stored scores for the OLD schedule.
+      try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+      applyScheduleResult(result);
+      setupMsg('ok',
+        'Done. Built ' + result.matches.length + ' matches across ' +
+        result.slots.length + ' slots (seed ' + result.seed +
+        ', team-seed ' + result.teamSeed + ').');
+      // Also try to push to the server in the background (best-effort).
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg),
+      }).catch(() => {});
+    } catch (err) {
+      console.error(err);
+      setupMsg('err', 'Regenerate failed:\n' + (err.stack || err.message || err));
+    } finally {
+      _setupBusy = false;
+    }
+  }, 30);
+}
+
+function escAttr(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escText(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Restore saved scores into inputs and trigger UI updates
+(function restoreUI() {
+  MATCHES.forEach((m, mi) => {
+    if (m.isFfa) {
+      m.team1.forEach((pi, i) => {
+        const el = document.getElementById(`ffa-${mi}-${i}`);
+        if (el && matchScores[mi].ffa[i] !== null) el.value = matchScores[mi].ffa[i];
+      });
+      onFfaScore(mi);
+    } else {
+      const e1 = document.getElementById('t1-' + mi);
+      const e2 = document.getElementById('t2-' + mi);
+      if (e1 && matchScores[mi].t1 !== null) e1.value = matchScores[mi].t1;
+      if (e2 && matchScores[mi].t2 !== null) e2.value = matchScores[mi].t2;
+      onTeamScore(mi);
+    }
+  });
+})();
+</script>
+</body>
+</html>
