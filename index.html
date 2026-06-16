@@ -269,10 +269,11 @@
 </div>
 
 <script>
-let NAMES   = ["Sebi", "Mateo", "Cris F.", "John", "Paula", "Diego"];
-let MATCHES = [{"game": "Volley", "note": "3v3", "slotIdx": 1, "slotLabel": "Slot 1", "isFfa": false, "team1": [4, 0, 1], "team2": [2, 3, 5], "funPlayers": []}, {"game": "Volley", "note": "3v3", "slotIdx": 2, "slotLabel": "Slot 2", "isFfa": false, "team1": [2, 0, 5], "team2": [1, 3, 4], "funPlayers": []}, {"game": "Volley", "note": "3v3", "slotIdx": 3, "slotLabel": "Slot 3", "isFfa": false, "team1": [4, 0, 3], "team2": [5, 1, 2], "funPlayers": []}, {"game": "Volley", "note": "3v3", "slotIdx": 4, "slotLabel": "Slot 4", "isFfa": false, "team1": [1, 5, 0], "team2": [4, 2, 3], "funPlayers": []}];
-const INITIAL_CONFIG = {"games": {"Volley": {"max_players": 4, "min_players": 2, "preferred_players": 3, "ffa": false, "repeat_game": 4, "repeat_teams": false}}, "players": {"Sebi": {}, "Mateo": {}, "Cris F.": {}, "John": {}, "Paula": {}, "Diego": {}}};
-const CONFIG_STORAGE_KEY = 'tournament_config_v1';
+let NAMES   = [];
+let MATCHES = [];
+const INITIAL_CONFIG = {"games": {}, "players": {}};
+const CONFIG_STORAGE_KEY = 'tournament_config_v2';
+const SCHEDULE_STORAGE_KEY = 'tournament_schedule_v1';
 
 function computeStorageKey(matches) {
   // Simple deterministic string hash (djb2) over the JSON of matches.
@@ -280,6 +281,44 @@ function computeStorageKey(matches) {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
   return 'tournament_' + h.toString(16);
+}
+
+function loadPersistedSchedule() {
+  try {
+    const raw = localStorage.getItem(SCHEDULE_STORAGE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved || !Array.isArray(saved.names) || !Array.isArray(saved.matches)) return null;
+    return saved;
+  } catch (e) {
+    return null;
+  }
+}
+
+function savePersistedSchedule(result) {
+  try {
+    localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify({
+      names: result.names,
+      matches: result.matches,
+      seed: result.seed,
+      teamSeed: result.teamSeed,
+    }));
+  } catch (e) {}
+}
+
+const persistedSchedule = loadPersistedSchedule();
+if (persistedSchedule) {
+  NAMES = persistedSchedule.names.slice();
+  MATCHES = persistedSchedule.matches.map(m => ({
+    game: m.game,
+    note: m.note,
+    slotIdx: m.slotIdx,
+    slotLabel: m.slotLabel,
+    isFfa: !!m.isFfa,
+    team1: (m.team1 || []).slice(),
+    team2: (m.team2 || []).slice(),
+    funPlayers: (m.funPlayers || []).slice(),
+  }));
 }
 
 let STORAGE_KEY = computeStorageKey(MATCHES);
@@ -1343,6 +1382,7 @@ function applyScheduleResult(result) {
     team1: m.team1.slice(), team2: m.team2.slice(),
     funPlayers: m.funPlayers.slice(),
   }));
+  savePersistedSchedule(result);
   STORAGE_KEY = computeStorageKey(MATCHES);
   playerPts = new Array(NAMES.length).fill(0);
   matchScores = MATCHES.map(m => m.isFfa
